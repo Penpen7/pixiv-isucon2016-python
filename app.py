@@ -408,7 +408,7 @@ def get_banned():
     cursor.execute('SELECT * FROM `users` WHERE `authority` = 0 AND `del_flg` = 0 ORDER BY `created_at` DESC')
     users = cursor.fetchall()
 
-    flask.render_template("banned.html", users=users, me=me)
+    return flask.render_template("banned.html", users=users, me=me)
 
 @app.route('/admin/banned', methods=['POST'])
 def post_banned():
