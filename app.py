@@ -15,6 +15,7 @@ import pymc_session
 
 UPLOAD_LIMIT = 10 * 1024 * 1024 # 10mb
 POSTS_PER_PAGE = 20
+IMAGE_DIR="../public/image"
 
 
 _config = None
@@ -34,6 +35,19 @@ def config():
         if password:
             _config['db']['passwd'] = password
     return _config
+
+def file_initialize():
+    files = os.listdir(IMAGE_DIR)
+
+    for f in files:
+        if not os.path.isfile(os.path.join(IMAGE_DIR, f)):
+            continue
+
+        idStr = os.path.splitext(os.path.basename(f))[0]
+        id = int(idStr)
+
+        if id > 10000:
+            os.remove(os.path.join(IMAGE_DIR, f))
 
 _db = None
 
@@ -183,6 +197,7 @@ def nl2br(eval_ctx, value):
 
 @app.route('/initialize')
 def get_initialize():
+    file_initialize()
     db_initialize()
     return ''
 
@@ -338,6 +353,15 @@ def post_index():
         flask.flash("投稿できる画像形式はjpgとpngとgifだけです")
         return flask.redirect('/')
 
+    ext = ""
+    if mime in "image/jpeg":
+        ext = "jpg"
+    elif mime in "image/png":
+        ext = "png"
+    elif mime in "image/gif":
+        ext = "gif"
+
+
     with tempfile.TemporaryFile() as tempf:
         file.save(tempf)
         tempf.flush()
@@ -351,8 +375,12 @@ def post_index():
 
     query = 'INSERT INTO `posts` (`user_id`, `mime`, `imgdata`, `body`) VALUES (%s,%s,%s,%s)'
     cursor = db().cursor()
-    cursor.execute(query, (me['id'], mime, imgdata, flask.request.form.get('body')))
+    cursor.execute(query, (me['id'], mime, "", flask.request.form.get('body')))
     pid = cursor.lastrowid
+
+    with open(f"{IMAGE_DIR}/{pid}.{ext}", 'b') as file:
+        file.write(imgdata)
+
     return flask.redirect("/posts/%d" % pid)
 
 @app.route('/image/<id>.<ext>')
@@ -371,6 +399,8 @@ def get_image(id, ext):
     if (ext == 'jpg' and mime == "image/jpeg"
             or ext == 'png' and mime == "image/png"
             or ext == 'gif' and mime == "image/gif"):
+        with open(f"{IMAGE_DIR}/{id}.{ext}", 'b') as file:
+            file.write(post['imgdata'])
         return flask.Response(post['imgdata'], mimetype=mime)
 
     flask.abort(404)
