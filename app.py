@@ -15,6 +15,7 @@ import pymc_session
 
 UPLOAD_LIMIT = 10 * 1024 * 1024 # 10mb
 POSTS_PER_PAGE = 20
+IMAGE_DIR="../public/image"
 
 
 _config = None
@@ -34,6 +35,20 @@ def config():
         if password:
             _config['db']['passwd'] = password
     return _config
+
+def file_initialize():
+    pathlib.Path(IMAGE_DIR).mkdir(parents=True, exist_ok=True)
+    files = os.listdir(IMAGE_DIR)
+
+    for f in files:
+        if not os.path.isfile(os.path.join(IMAGE_DIR, f)):
+            continue
+
+        idStr = os.path.splitext(os.path.basename(f))[0]
+        id = int(idStr)
+
+        if id > 10000:
+            os.remove(os.path.join(IMAGE_DIR, f))
 
 _db = None
 
@@ -136,11 +151,8 @@ def make_posts(results, all_comments=False):
         cursor.execute("SELECT * FROM `users` WHERE `id` = %s", (post['user_id'],))
         post['user'] = cursor.fetchone()
 
-        if not post['user']['del_flg']:
-            posts.append(post)
+        posts.append(post)
 
-        if len(posts) >= POSTS_PER_PAGE:
-            break
     return posts
 
 
@@ -183,6 +195,7 @@ def nl2br(eval_ctx, value):
 
 @app.route('/initialize')
 def get_initialize():
+    file_initialize()
     db_initialize()
     return ''
 
@@ -247,7 +260,33 @@ def get_index():
     me = get_session_user()
 
     cursor = db().cursor()
-    cursor.execute('SELECT `id`, `user_id`, `body`, `created_at`, `mime` FROM `posts` ORDER BY `created_at` DESC')
+    cursor.execute(
+        '''
+        SELECT
+            p.id AS `id`,
+            p.user_id AS `user_id`,
+            p.body AS `body`,
+            p.mime AS `mime`,
+            p.created_at AS `created_at`,
+            u.id AS `uesr_user_id`,
+            u.account_name AS `uesr_account_name`,
+            u.passhash AS `uesr_passhash`,
+            u.authority AS `uesr_authority`,
+            u.del_flg AS `uesr_del_flg`,
+            u.created_at AS `uesr_created_at`
+        FROM
+            `posts` p  FORCE INDEX(`posts_order_idx`)
+        JOIN 
+            `users` u ON p.user_id = u.id
+        WHERE
+            u.del_flg = 0
+        ORDER BY
+            p.created_at DESC
+        LIMIT
+            %s
+        ''',
+        (POSTS_PER_PAGE,)
+    )
     posts = make_posts(cursor.fetchall())
 
     return flask.render_template("index.html", posts=posts, me=me)
@@ -298,9 +337,61 @@ def get_posts():
     max_created_at = flask.request.args['max_created_at'] or None
     if max_created_at:
         max_created_at = _parse_iso8601(max_created_at)
-        cursor.execute('SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `created_at` <= %s ORDER BY `created_at` DESC', (max_created_at,))
+        cursor.execute(
+            '''
+            SELECT
+                p.id AS `id`,
+                p.user_id AS `user_id`,
+                p.body AS `body`,
+                p.mime AS `mime`,
+                p.created_at AS `created_at`,
+                u.id AS `uesr_user_id`,
+                u.account_name AS `uesr_account_name`,
+                u.passhash AS `uesr_passhash`,
+                u.authority AS `uesr_authority`,
+                u.del_flg AS `uesr_del_flg`,
+                u.created_at AS `uesr_created_at`
+            FROM
+                `posts` p  FORCE INDEX(`posts_order_idx`)
+            JOIN 
+                `users` u ON p.user_id = u.id
+            WHERE
+                p.created_at <= %s AND u.del_flg = 0
+            ORDER BY
+                p.created_at DESC
+            LIMIT
+                %s
+            ''',
+            (max_created_at, POSTS_PER_PAGE,)
+        )
     else:
-        cursor.execute('SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE ORDER BY `created_at` DESC')
+        cursor.execute(
+            '''
+            SELECT
+                p.id AS `id`,
+                p.user_id AS `user_id`,
+                p.body AS `body`,
+                p.mime AS `mime`,
+                p.created_at AS `created_at`,
+                u.id AS `uesr_user_id`,
+                u.account_name AS `uesr_account_name`,
+                u.passhash AS `uesr_passhash`,
+                u.authority AS `uesr_authority`,
+                u.del_flg AS `uesr_del_flg`,
+                u.created_at AS `uesr_created_at`
+            FROM
+                `posts` p  FORCE INDEX(`posts_order_idx`)
+            JOIN 
+                `users` u ON p.user_id = u.id
+            WHERE
+                u.del_flg = 0
+            ORDER BY
+                p.created_at DESC
+            LIMIT
+                %s
+            ''',
+            (POSTS_PER_PAGE,)
+        )
     results = cursor.fetchall()
     posts = make_posts(results)
     return flask.render_template("posts.html", posts=posts)
@@ -310,7 +401,34 @@ def get_posts():
 def get_posts_id(id):
     cursor = db().cursor()
 
-    cursor.execute("SELECT * FROM `posts` WHERE `id` = %s", (id,))
+    cursor.execute(
+        '''
+        SELECT
+            p.id AS `id`,
+            p.user_id AS `user_id`,
+            p.body AS `body`,
+            p.imgdata AS `imgdata`,
+            p.mime AS `mime`,
+            p.created_at AS `created_at`,
+            u.id AS `uesr_user_id`,
+            u.account_name AS `uesr_account_name`,
+            u.passhash AS `uesr_passhash`,
+            u.authority AS `uesr_authority`,
+            u.del_flg AS `uesr_del_flg`,
+            u.created_at AS `uesr_created_at`
+        FROM
+            `posts` p
+        JOIN 
+            `users` u ON p.user_id = u.id
+        WHERE
+            p.id = %s AND u.del_flg = 0
+        ORDER BY
+            p.created_at DESC
+        LIMIT
+            %s
+        ''',
+        (id, POSTS_PER_PAGE,)
+    )
     posts = make_posts(cursor.fetchall(), all_comments=True)
     if not posts:
         flask.abort(404)
@@ -338,6 +456,15 @@ def post_index():
         flask.flash("投稿できる画像形式はjpgとpngとgifだけです")
         return flask.redirect('/')
 
+    ext = ""
+    if mime in "image/jpeg":
+        ext = "jpg"
+    elif mime in "image/png":
+        ext = "png"
+    elif mime in "image/gif":
+        ext = "gif"
+
+
     with tempfile.TemporaryFile() as tempf:
         file.save(tempf)
         tempf.flush()
@@ -351,8 +478,13 @@ def post_index():
 
     query = 'INSERT INTO `posts` (`user_id`, `mime`, `imgdata`, `body`) VALUES (%s,%s,%s,%s)'
     cursor = db().cursor()
-    cursor.execute(query, (me['id'], mime, imgdata, flask.request.form.get('body')))
+    cursor.execute(query, (me['id'], mime, "", flask.request.form.get('body')))
     pid = cursor.lastrowid
+
+    pathlib.Path(IMAGE_DIR).mkdir(parents=True, exist_ok=True)
+    with open(f"{IMAGE_DIR}/{pid}.{ext}", 'w+b') as file:
+        file.write(imgdata)
+
     return flask.redirect("/posts/%d" % pid)
 
 @app.route('/image/<id>.<ext>')
@@ -371,6 +503,9 @@ def get_image(id, ext):
     if (ext == 'jpg' and mime == "image/jpeg"
             or ext == 'png' and mime == "image/png"
             or ext == 'gif' and mime == "image/gif"):
+        pathlib.Path(IMAGE_DIR).mkdir(parents=True, exist_ok=True)
+        with open(f"{IMAGE_DIR}/{id}.{ext}", 'w+b') as file:
+            file.write(post['imgdata'])
         return flask.Response(post['imgdata'], mimetype=mime)
 
     flask.abort(404)
