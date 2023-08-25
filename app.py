@@ -275,7 +275,7 @@ def get_index():
             u.del_flg AS `uesr_del_flg`,
             u.created_at AS `uesr_created_at`
         FROM
-            `posts` p
+            `posts` p  FORCE INDEX(`posts_order_idx`)
         JOIN 
             `users` u ON p.user_id = u.id
         WHERE
@@ -352,7 +352,7 @@ def get_posts():
                 u.del_flg AS `uesr_del_flg`,
                 u.created_at AS `uesr_created_at`
             FROM
-                `posts` p
+                `posts` p  FORCE INDEX(`posts_order_idx`)
             JOIN 
                 `users` u ON p.user_id = u.id
             WHERE
@@ -380,7 +380,7 @@ def get_posts():
                 u.del_flg AS `uesr_del_flg`,
                 u.created_at AS `uesr_created_at`
             FROM
-                `posts` p
+                `posts` p  FORCE INDEX(`posts_order_idx`)
             JOIN 
                 `users` u ON p.user_id = u.id
             WHERE
