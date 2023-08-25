@@ -380,7 +380,7 @@ def post_index():
     pid = cursor.lastrowid
 
     os.mkdir(IMAGE_DIR, exist_ok=True)
-    with open(f"{IMAGE_DIR}/{pid}.{ext}", 'b') as file:
+    with open(f"{IMAGE_DIR}/{pid}.{ext}", 'w+b') as file:
         file.write(imgdata)
 
     return flask.redirect("/posts/%d" % pid)
@@ -402,7 +402,7 @@ def get_image(id, ext):
             or ext == 'png' and mime == "image/png"
             or ext == 'gif' and mime == "image/gif"):
         os.mkdir(IMAGE_DIR, exist_ok=True)
-        with open(f"{IMAGE_DIR}/{id}.{ext}", 'b') as file:
+        with open(f"{IMAGE_DIR}/{id}.{ext}", 'w+b') as file:
             file.write(post['imgdata'])
         return flask.Response(post['imgdata'], mimetype=mime)
 
