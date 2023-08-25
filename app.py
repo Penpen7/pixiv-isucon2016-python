@@ -37,7 +37,7 @@ def config():
     return _config
 
 def file_initialize():
-    os.mkdir(IMAGE_DIR, exist_ok=True)
+    pathlib.Path(IMAGE_DIR).mkdir(parents=True, exist_ok=True)
     files = os.listdir(IMAGE_DIR)
 
     for f in files:
@@ -379,7 +379,7 @@ def post_index():
     cursor.execute(query, (me['id'], mime, "", flask.request.form.get('body')))
     pid = cursor.lastrowid
 
-    os.mkdir(IMAGE_DIR, exist_ok=True)
+    pathlib.Path(IMAGE_DIR).mkdir(parents=True, exist_ok=True)
     with open(f"{IMAGE_DIR}/{pid}.{ext}", 'w+b') as file:
         file.write(imgdata)
 
@@ -401,7 +401,7 @@ def get_image(id, ext):
     if (ext == 'jpg' and mime == "image/jpeg"
             or ext == 'png' and mime == "image/png"
             or ext == 'gif' and mime == "image/gif"):
-        os.mkdir(IMAGE_DIR, exist_ok=True)
+        pathlib.Path(IMAGE_DIR).mkdir(parents=True, exist_ok=True)
         with open(f"{IMAGE_DIR}/{id}.{ext}", 'w+b') as file:
             file.write(post['imgdata'])
         return flask.Response(post['imgdata'], mimetype=mime)
